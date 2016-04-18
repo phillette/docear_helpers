@@ -12,7 +12,7 @@ where ``command`` is one of the following:
 
     (make sure that docear is closed for this to work - otherwise settings get overwritten and the project cannot be automatically imported)
 - move : moves / renames docear project to another directory
-- autorename : renames all pdf files according to there meta-data in
+- autorename : renames all pdf files according to their meta-data in
   references.bib (concerns all pdfs listed in the given docear project)
 - open_user_settings : opens the user.settings file in the default text editor
 
