@@ -1,0 +1,12 @@
+<project name="PROJECTNAME" ID="IDIDIDID" version="docear 1.0">
+<folder type="library" name="Library">
+<link type="literature_annotations" name="Literature &amp; Annotations" path="project://IDIDIDID/_data/IDIDIDID/default_files/literature_and_annotations.mm"/>
+<link type="file" name="Temp" path="project://IDIDIDID/_data/IDIDIDID/default_files/temp.mm" system="true"/>
+<link type="file" name="Trash" path="project://IDIDIDID/_data/IDIDIDID/default_files/trash.mm" system="true"/>
+</folder>
+<folder type="physical" name="My drafts" path="project://IDIDIDID/_data/IDIDIDID/My%20Drafts/"/>
+<folder type="literature_repository" name="Literature repository" system="true">
+<folder type="repository_path" name="LITERATURENAME" path="project://IDIDIDID/LITERATUREFOLDERNAME/"/>
+</folder>
+<link type="references" name="References" path="project://IDIDIDID/references.bib" system="true"/>
+</project>

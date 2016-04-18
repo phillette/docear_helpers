@@ -1,0 +1,233 @@
+#! /usr/bin/python
+from __future__ import print_function, division
+import scriptine
+import os, sys, subprocess
+import urlparse, urllib
+from bs4 import BeautifulSoup as Soup
+import regex, bibtexparser
+import shutil, glob
+from datetime import datetime
+import re
+from distutils.dir_util import copy_tree
+
+from schlichtanders.mystrings import append_after, replace_all
+from schlichtanders.myos import manipulate_file, open_by_default_application, abspath, ensure_endswith_sep
+import string
+import random
+
+__path__ = os.path.dirname(os.path.abspath(__file__))
+# constants
+# ---------
+#
+user_settings_path = os.path.expanduser("~/.docear/users/local/user.settings")
+
+project_id_regex = regex.compile(r"project://([^/]*)")
+_pseudo_url_start = "file\:"
+_real_url_start = "file://"
+
+# helpers
+# -------
+#
+def quote(s):
+    return urllib.quote(s, safe='/(),')
+def unquote(s):
+    return urllib.unquote(s)
+
+def url2path(file_url):
+    return urllib.unquote(file_url)[7:]
+
+def subs_project(paths):
+    if isinstance(paths, list):
+        return [_subs_project(path) for path in paths]
+    else:
+        return _subs_project(paths)
+
+def _subs_project(path_url):
+    project_id = project_id_regex.match(path_url).group(1)
+    project_path = user_settings[project_id].replace(_pseudo_url_start, _real_url_start) # this is percent encoded url (hopefully)
+    project_path = url2path(project_path)
+    return path_url.replace("project://" + project_id + "/", project_path) # path_url is percent encoded url for sure
+
+def id_generator(size=33-2, chars=string.ascii_uppercase + string.digits):
+    # full year used here is two characters longer than year used in docear usually, therefore -2
+    return ''.join(random.SystemRandom().choice(chars) for _ in range(size))
+
+# commands
+# ========
+
+def open_user_settings_command():
+    open_by_default_application(user_settings_path)
+
+def init_command(literatur_dir=".", bibfile=None, projectname=None):
+    now = datetime.now()
+    newID = "%s%s%s" % (now.year, now.month, id_generator())
+
+    curdir_path = abspath(os.path.curdir)
+    _, curdir_fn = os.path.split(curdir_path)
+    settingsxlm_dir = os.path.join(curdir_path, "_data", newID)
+    settingsxlm_fn = os.path.join(settingsxlm_dir, "settings.xml")
+
+    # copy initialization files
+    # -------------------------
+
+    copy_tree(os.path.join(__path__,"docear_init", "_data", "IDIDIDID"), settingsxlm_dir)
+
+    # adapt user.settings
+    # -------------------
+
+    line_start = "org.freeplane.plugin.workspace.mindmapmode.model.projects"
+    pattern_line_starting_with = r"^%s.*$"
+    manipulate_file(append_after, user_settings_path,
+        string = ",%s" % newID,
+        split_regex = pattern_line_starting_with % line_start
+    )
+    add_to_user_settings = "%s=file\\:%s\n" % (newID, quote(ensure_endswith_sep(curdir_path)))
+    manipulate_file(append_after, user_settings_path, add_to_user_settings)
+
+    # adapt settings.xml
+    # ------------------
+
+    if projectname is None:
+        projectname = curdir_fn
+
+    literaturename = curdir_fn if literatur_dir == "." else os.path.split(literatur_dir)[1]
+    literatur_dir = "" if literatur_dir == "." else quote(ensure_endswith_sep(literatur_dir))
+
+    replace = {
+        "IDIDIDID" : newID,
+        "PROJECTNAME" : projectname,
+        "LITERATURENAME" : literaturename,
+        "LITERATUREFOLDERNAME/" : literatur_dir,
+    }
+
+    if bibfile is not None:
+        replace["references.bib"] = bibfile
+    else:
+        open(os.path.join(curdir_path, "references.bib"), 'w')
+
+    manipulate_file(replace_all, settingsxlm_fn, replace)
+    pass
+
+def autorename_command(project_path, format=r"%AUTHOR (%YEAR) %TITLE"):
+    """ Renames all files to bibtex entries """
+    project_path = abspath(project_path)
+    try:
+        project_setting_file = glob.glob(os.path.join(project_path,"_data/*/settings.xml"))[0]
+    except IndexError:
+        print("Not a project directory. Nothing renamed")
+        return
+
+    # collect all files
+    # -----------------
+    with open(project_setting_file) as pro:
+        soup = Soup(pro, 'xml')
+        # project_id = soup.project['ID']  # not needed for now
+        mindmaps = [ link['path'] for link in soup.select("folder[type=library] > link")]
+        bibfile = soup.find(type="references")["path"]
+
+    mindmaps = subs_project(mindmaps)
+    bibfile = subs_project(bibfile)
+
+    # go through all renamings
+    template = regex.sub(r"%[A-Z]*", lambda p: "{%s}" % p.group()[1:].lower(), format)
+    #template = format.replace("%AUTHOR", "{author}").replace("%YEAR", "{year}").replace("%TITLE", "{title}")
+    template += ".pdf"
+
+    with open(bibfile) as bib:
+        bibdb = bibtexparser.load(bib)
+
+    change = False
+    for entry in bibdb.entries:
+        _entry = {} #make entries uniform entries
+        for key in entry.keys():
+            _entry[key] = entry[key].replace("\n", " ")
+
+        new_file = template.format(**_entry)
+        # TODO escaped sequences seem to get double escaped, i._entry. \->\\
+        # print("#\\\\:", new_file.count("\\\\"))
+        new_file = new_file.replace("\\\\", "\\")
+
+        _start, _end = ":", ":PDF"
+        if not _entry['file'].startswith(_start) or not _entry['file'].endswith(_end):
+            continue
+
+        old_path = _entry['file'][len(_start):-len(_end)]
+        folder, old_file = os.path.split(old_path)
+        new_path = os.path.join(folder, new_file)
+
+        if old_file == new_file:
+            continue
+        change = True
+
+        # change file names:
+        shutil.copy(old_path, old_path + ".bak") # security copy
+        shutil.move(old_path, new_path)
+        entry['file'] = _start + new_path + _end
+
+        # change everything in mindmaps accordingly: SPECIAL PERCENT ENCODING NEEDED!!
+        new_url_part = quote(new_file)
+        old_url_part = quote(old_file)
+
+        # IMPORTANT: first change url, then normal file, as otherwise urls might get disrupted.
+        # TODO maybe make everything non-url if docear can fix url to not have weird url outputs, where there should be a normal path
+        replace = OrderedDict([
+            (old_url_part, new_url_part),
+            (old_file, new_file),
+        ])
+        for mm in mindmaps:
+            try:
+                manipulate_file(replace_in_file, mm, replace)
+            except IOError:
+                continue
+    if change:
+        print("renamed files")
+        shutil.copy(bibfile, bibfile+".bak") # security copy
+        with open(bibfile, "w") as f:
+            bibtexparser.dump(bibdb, f)
+
+
+def move_command(cur_dir, new_dir):
+    old_dir = abspath(cur_dir)
+    new_dir = abspath(new_dir)
+    old_url = quote(old_dir)
+    new_url = quote(new_dir)
+
+    try:
+        project_setting_file = glob.glob(os.path.join(old_dir,"_data/*/settings.xml"))[0]
+    except IndexError:
+        print("Not a project directory. Nothing moved")
+        return
+
+    # Update references.bib file
+    # --------------------------
+    with open(project_setting_file) as f:
+        soup = Soup(f, 'xml')
+        bibfile = soup.find(type="references")["path"]
+        bibfile = subs_project(bibfile)
+
+    replace_bib = {
+        old_dir : new_dir
+    }
+    replace_us = {
+        old_url : new_url
+    }
+    manipulate_file(replace_all, bibfile, replace_bib)
+    manipulate_file(replace_all, user_settings_path, replace_us)
+
+    # Move directory
+    # --------------
+    shutil.move(old_dir, new_dir)
+
+
+if __name__ == '__main__':
+    #extract all user_settings (here mainly the project directories are needed)
+    user_settings = {}
+    with open(user_settings_path) as f:
+        for line in f.read().splitlines():
+            try:
+                key, value = line.split("=")
+                user_settings[key] = value
+            except ValueError:
+                continue
+
+    scriptine.run()
