@@ -5,7 +5,8 @@ This respository mainly contains a small python script ``docear_helpers``.
 It is for use with an installation of docear, the literatur and pdf mindmapping
 tool.
 
-Make docear_helpers executable (chmod +x docear_helpers) and use like::
+Make docear_helpers executable (chmod +x docear_helpers) and use like:
+
     $docear_helpers command
 
 where ``command`` is one of the following:
