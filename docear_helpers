@@ -15,7 +15,7 @@ from schlichtanders.myos import manipulate_file, open_by_default_application, ab
 import string
 import random
 
-__path__ = os.path.dirname(os.path.abspath(__file__))
+__path__ = os.path.dirname(os.path.realpath(__file__))
 # constants
 # ---------
 #
@@ -56,9 +56,22 @@ def id_generator(size=33-2, chars=string.ascii_uppercase + string.digits):
 # ========
 
 def open_user_settings_command():
+    """ opens user.settings file with default text editor """
     open_by_default_application(user_settings_path)
 
 def init_command(literatur_dir=".", bibfile=None, projectname=None):
+    """ initializes current directory as a docear project
+
+    Make sure that docear is closed for this to work.
+    Otherwise settings get overwritten and the project cannot be automatically imported.
+
+    :param literatur_dir:    Optional directory for literatur (pdfs or other files which get automatically drawn into docear). Defaults to current directory itself
+
+    :param bibfile:          Optional name of (latex) bib-file for already existent references. Defaults to creating `references.bib`
+
+    :param projectname:      Optional name of project which appears in docear projekt-list. Defaults to name of current directory.
+
+    """
     now = datetime.now()
     newID = "%s%s%s" % (now.year, now.month, id_generator())
 
@@ -109,7 +122,12 @@ def init_command(literatur_dir=".", bibfile=None, projectname=None):
     pass
 
 def autorename_command(project_path, format=r"%AUTHOR (%YEAR) %TITLE"):
-    """ Renames all files to bibtex entries """
+    """ renames all pdf files according to their meta-data in references.bib
+    (concerns all pdfs listed in the given docear project)
+
+    :param project_path:     directory to docear folder (e.g. where `docear_helpers init` was called)
+    :param format:           Optional semi-abstract format string. %AUTHOR, %YEAR, %TITLE, etc (capitalized versions of bib-file entries) get replaced by their bib-file match.
+     """
     project_path = abspath(project_path)
     try:
         project_setting_file = glob.glob(os.path.join(project_path,"_data/*/settings.xml"))[0]
@@ -187,6 +205,12 @@ def autorename_command(project_path, format=r"%AUTHOR (%YEAR) %TITLE"):
 
 
 def move_command(cur_dir, new_dir):
+    """ moves / renames docear project to another directory
+
+    :param cur_dir: docear directory (e.g. initilized with `docear_helpers init`)
+    :param new_dir: docear directory to move to (e.g. initilized with `docear_helpers init`)
+    """
+
     old_dir = abspath(cur_dir)
     new_dir = abspath(new_dir)
     old_url = quote(old_dir)
