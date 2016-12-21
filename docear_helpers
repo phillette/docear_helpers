@@ -4,7 +4,7 @@ import scriptine
 import os, sys, subprocess
 import urlparse, urllib
 from bs4 import BeautifulSoup as Soup
-import regex, bibtexparser
+import re, bibtexparser
 import shutil, glob
 from datetime import datetime
 import re
@@ -14,14 +14,25 @@ from schlichtanders.mystrings import append_after, replace_all
 from schlichtanders.myos import manipulate_file, open_by_default_application, abspath, ensure_endswith_sep
 import string
 import random
+from getpass import getuser
+from sys import platform
 
 __path__ = os.path.dirname(os.path.realpath(__file__))
+absolute_path = re.compile(r"[A-Z]:")
 # constants
 # ---------
 #
-user_settings_path = os.path.expanduser("~/.docear/users/local/user.settings")
 
-project_id_regex = regex.compile(r"project://([^/]*)")
+if platform in ["win32", "cygwin"]:
+    user_settings_path = os.path.expanduser(r"c:\Users\%s\.docear/users/local/user.settings" % getuser())
+elif platform in ["darwin"]:
+    user_settings_path = os.path.expanduser("/User/%s/.docear/users/local/user.settings" % getuser())
+elif platform in ["linux2"]:
+    user_settings_path = os.path.expanduser("~/.docear/users/local/user.settings")
+else:
+    raise RuntimeError("Platform not supported. Could not find Docear Settings folder.")
+
+project_id_regex = re.compile(r"project://([^/]*)")
 _pseudo_url_start = "file\:"
 _real_url_start = "file://"
 
@@ -29,7 +40,14 @@ _real_url_start = "file://"
 # -------
 #
 def quote(s):
+    if platform in ["win32", "cygwin"]:
+        s = urllib.quote(s, safe=r'/\(),:')
+        s = s.replace("\\", "/")
+        if absolute_path.match(s):
+            s = "/" + s.replace(":", r"\:")
+        return s
     return urllib.quote(s, safe='/(),')
+
 def unquote(s):
     return urllib.unquote(s)
 
@@ -147,7 +165,7 @@ def autorename_command(project_path, format=r"%AUTHOR (%YEAR) %TITLE"):
     bibfile = subs_project(bibfile)
 
     # go through all renamings
-    template = regex.sub(r"%[A-Z]*", lambda p: "{%s}" % p.group()[1:].lower(), format)
+    template = re.sub(r"%[A-Z]*", lambda p: "{%s}" % p.group()[1:].lower(), format)
     #template = format.replace("%AUTHOR", "{author}").replace("%YEAR", "{year}").replace("%TITLE", "{title}")
     template += ".pdf"
 
