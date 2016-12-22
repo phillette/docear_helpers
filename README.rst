@@ -16,3 +16,18 @@ where ``command`` is one of the following:
   references.bib (concerns all pdfs listed in the given docear project)
 - open_user_settings : opens the user.settings file in the default text editor
 
+
+
+tips and tricks
+===============
+
+To enhance Docear on Windows, enter this line into the manual pdf reader configuration part under preferences.
+
+    C:\Program Files\Tracker Software\PDF Viewer\PDFXCview.exe*/A*"nolock=yes=OpenParameters &page=$PAGE"*"$FILE"
+
+The nolock is crucial for enabling auto update from docear to pdf-reader.
+
+Unfortunately the other direction is not yet supported by docear, you have to update your incoming node manually and
+pick for every change the pdf-version.
+I would love to implement an automatic overwrite feature for this on pdf change, however I am still not into docear
+source code yet.
