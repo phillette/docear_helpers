@@ -49,7 +49,7 @@ else:
 
 def from_bibtexpath(path):
     if platform in ["win32", "cygwin"]:
-        path = path.replace(r"\:", ":")
+        path = path.replace(r"\:", ":")  # all have to be replaced
         path = path.replace("\\\\", "\\")
         # path = path.replace("\\\\", "/")  # first search for raw encoding
         # path = path.replace("\\", "/")  # then for non-raw encoding (the other way arround does not work)
@@ -59,9 +59,9 @@ def from_bibtexpath(path):
 
 def to_bibtexpath(path):
     if platform in ["win32", "cygwin"]:
-        if absolute_path.match(path):
-            path = re.sub(":", r"\:", path, count=1)  # replace only first one which we checked is there
         path = path.replace("\\", "\\\\")
+        if absolute_path.match(path):
+            path = re.sub(r"(?<!\\):", r"\:", path)  # all have to be quoted!
         # path = path.replace("\\\\", "/")  # first search for raw encoding
         # path = path.replace("\\", "/")  # then for non-raw encoding (the other way arround does not work)
     else:
@@ -177,8 +177,8 @@ def init_command(literatur_dir=".", bibfile=None, projectname=None):
 
     if bibfile is not None:
         replace["references.bib"] = bibfile
-    else:
-        open(os.path.join(curdir_path, "references.bib"), 'w')
+    elif not os.path.exists(os.path.join(curdir_path, "references.bib")):
+        open(os.path.join(curdir_path, "references.bib"), 'w').close()
 
     manipulate_file(replace_all, settingsxlm_fn, replace)
     pass
